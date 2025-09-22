@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Truy Tìm Manh Mối</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #74ebd5, #ACB6E5);
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      color: #222;
+      text-shadow: 1px 1px 2px #fff;
+    }
+
+    .game-container {
+      position: relative;
+      width: 450px;
+      height: 450px;
+      border: 4px solid #333;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .game-container img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(3, 1fr);
+      width: 100%;
+      height: 100%;
+    }
+
+    .cell {
+      background: #333;
+      border: 1px solid #fff;
+      cursor: pointer;
+      transition: background 0.3s, opacity 0.3s;
+    }
+
+    .cell.hidden {
+      background: #ccc;
+      cursor: default;
+    }
+
+    .cell.revealed {
+      background: transparent;
+      cursor: default;
+    }
+
+    .question-box {
+      margin-top: 25px;
+      padding: 20px;
+      border: 3px solid #444;
+      border-radius: 10px;
+      background: #fff;
+      display: none;
+      text-align: center;
+      max-width: 500px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.9);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .question-box p {
+      font-size: 22px;
+      font-weight: bold;
+      margin-bottom: 15px;
+    }
+
+    .timer {
+      font-size: 20px;
+      color: red;
+      margin: 10px 0;
+    }
+
+    .question-box button {
+      margin: 8px;
+      padding: 10px 15px;
+      font-size: 16px;
+      background: #4CAF50;
+      border: none;
+      border-radius: 5px;
+      color: white;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .question-box button:hover {
+      background: #45a049;
+    }
+
+    .wrong-btn {
+      background: #f44336 !important;
+    }
+
+    .wrong-btn:hover {
+      background: #d32f2f !important;
+    }
+
+    .reveal-button {
+      margin-top: 20px;
+      padding: 12px 20px;
+      font-size: 18px;
+      background: #FF5722;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      transition: background 0.3s;
+    }
+
+    .reveal-button:hover {
+      background: #e64a19;
+    }
+
+    .question {
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>Truy Tìm Manh Mối</h1>
+
+  <div class="game-container">
+    <img src="image/sm.jpg" alt="Hidden Image">
+    <div class="overlay"></div>
+  </div>
+
+  <div class="question-box" id="questionBox">
+    <p id="questionText"></p>
+    <div class="timer" id="timer">⏳ 30s</div>
+    <button id="startTimer">Bắt đầu</button>
+    <br>
+    <button id="correctBtn">Đúng</button>
+    <button id="wrongBtn" class="wrong-btn">Sai</button>
+  </div>
+
+  <button class="reveal-button" id="revealAll">Hiển thị hình ảnh</button>
+
+  <script>
+    const overlay = document.querySelector(".overlay");
+    const questionBox = document.getElementById("questionBox");
+    const questionText = document.getElementById("questionText");
+    const startTimer = document.getElementById("startTimer");
+    const timerDisplay = document.getElementById("timer");
+    const correctBtn = document.getElementById("correctBtn");
+    const wrongBtn = document.getElementById("wrongBtn");
+    const revealAllBtn = document.getElementById("revealAll");
+
+    let countdown;
+    let timeLeft = 30;
+    let currentCell = null;
+
+    // Danh sách câu hỏi
+    const questions = [
+      "Hiện tượng thiên nhiên nào thường hình thành trên biển, có sức gió mạnh, gây mưa lớn và thường được đặt tên riêng để dễ nhận diện?",
+      "Nhiệt độ của dung nham khi phun trào có thể lên tới bao nhiêu độ C?",
+      "Điền từ còn thiếu vào câu hát sau:\nMột màu ... .... \nMột màu ... ...\nMàu ... ... mắt em tôi ôi đẹp dịu dàng ?",
+      "Khoảng không gian mà Mặt Trời giữ vai trò trung tâm, chi phối quỹ đạo của tám hành tinh chính cùng vô số thiên thể nhỏ khác được gọi tên là gì?",
+      "Vệ tinh có biệt danh là xe tăng biết bay có tên là gì?",
+      "Trong cơ thể người, bạch cầu được ví như ai trong cuộc chiến chống lại vi khuẩn và virus?",
+      "Loại khí mà dùng để bơm bóng bay hay khinh khí cầu có tên là gì?",
+      "Logo Thế vận hội Olympic có tổng cộng bao nhiêu vòng tròn?",
+      "Trong thần thoại la mã cổ đại, Vua của các vị thần có tên là gì?"
+    ];
+
+    // Tạo 9 ô che
+    for (let i = 0; i < 9; i++) {
+      const cell = document.createElement("div");
+      cell.classList.add("cell");
+      cell.dataset.index = i;
+
+      cell.addEventListener("click", () => {
+        if (!cell.classList.contains("revealed") && !cell.classList.contains("hidden")) {
+          currentCell = cell;
+          showQuestion(i);
+        }
+      });
+
+      overlay.appendChild(cell);
+    }
+
+    function showQuestion(index) {
+      questionText.innerText = questions[index];
+      questionBox.style.display = "block";
+      timerDisplay.innerText = "⏳ 30s";
+      timeLeft = 30;
+      clearInterval(countdown);
+    }
+
+    // Nút bắt đầu đếm ngược
+    startTimer.addEventListener("click", () => {
+      clearInterval(countdown);
+      timeLeft = 30;
+      timerDisplay.textContent = `⏳ ${timeLeft}s`;
+
+      countdown = setInterval(() => {
+        timeLeft--;
+        timerDisplay.textContent = `⏳ ${timeLeft}s`;
+        if (timeLeft <= 0) {
+          clearInterval(countdown);
+          timerDisplay.textContent = "⏳ Hết giờ";
+        }
+      }, 1000);
+    });
+
+    // Nút chính xác
+    correctBtn.addEventListener("click", () => {
+      if (currentCell) {
+        currentCell.classList.add("revealed");
+        questionBox.style.display = "none";
+        clearInterval(countdown);
+      }
+    });
+
+    // Nút sai
+    wrongBtn.addEventListener("click", () => {
+      if (currentCell) {
+        currentCell.classList.add("hidden");
+        questionBox.style.display = "none";
+        clearInterval(countdown);
+      }
+    });
+
+    // Hiển thị toàn bộ hình ảnh
+    revealAllBtn.addEventListener("click", () => {
+      document.querySelectorAll(".cell").forEach(cell => {
+        cell.classList.add("revealed");
+      });
+      questionBox.style.display = "none";
+      clearInterval(countdown);
+    });
+  </script>
+</body>
+
+</html>
